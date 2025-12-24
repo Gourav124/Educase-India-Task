@@ -10,6 +10,7 @@ type Product = {
   description: string
   thumbnail: string
   price: string
+  quantity: number
 }
 
 const Homescreen = ({ navigation }: any) => {
@@ -23,46 +24,37 @@ const Homescreen = ({ navigation }: any) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`https://dummyjson.com/products?limit=1000&skip=10&select=title,price,thumbnail,description`);
-      const fetchedProducts = await res.json();
-      const items = fetchedProducts.products || [];
+      const res = await fetch(
+        `https://dummyjson.com/products?limit=1000&skip=10&select=title,price,thumbnail,description`
+      );
+      const json = await res.json();
+      const items = json.products || [];
       setData(items);
 
-      try {
-        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(items));
-      } catch (e) {
-        console.log('Failed to save cache', e);
-      }
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(items))
     } catch (error) {
-      console.log("Error : ", error);
+      console.warn('Fetch error:', error);
 
-      try {
-        const cached = await AsyncStorage.getItem(CACHE_KEY);
-        if (cached) {
-          setData(JSON.parse(cached));
-        }
-      } catch (e) {
-        console.log('Failed to read cache', e);
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const cachedItems = JSON.parse(cached);
+        setData(cachedItems);
+
       }
     } finally {
       setLoading(false);
     }
   }
 
-  const searchProducts = async (query: string) => {
+  const searchProducts = (query: string) => {
     if (!query.trim()) {
-      return
+      setData(data);
+      return;
     }
-    try {
-      setLoading(true);
-      const res = await fetch(`https://dummyjson.com/products/search?q=${query}`)
-      const searchedProducts = await res.json();
-      setData(searchedProducts.products);
-    } catch (error) {
-      console.log("Error : ", error);
-    } finally {
-      setLoading(false);
-    }
+    const filtered = data.filter(item =>
+      item.title.toLowerCase().includes(query.toLowerCase())
+    );
+    setData(filtered);
   }
 
   const handleSearch = () => {
@@ -70,25 +62,11 @@ const Homescreen = ({ navigation }: any) => {
   }
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      searchProducts(searchQuery)
-    })
-    return () => clearTimeout(handler)
+    searchProducts(searchQuery);
   }, [searchQuery]);
 
   useEffect(() => {
-    // const loadCacheAndFetch = async () => {
-    //   try {
-    //     const cached = await AsyncStorage.getItem(CACHE_KEY);
-    //     if (cached) {
-    //       setData(JSON.parse(cached));
-    //     }
-    //   } catch (e) {
-    //     console.log('Failed to read cache on mount', e);
-    //   }
-      fetchData();
-    // }
-    // loadCacheAndFetch();
+    fetchData();
   }, [])
 
   const renderFocusScreen = () => {
@@ -115,6 +93,7 @@ const Homescreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#dff9fb' }}>
       <View style={{ flex: 1, backgroundColor: '#dff9fb' }}>
+
         <View style={{ flexDirection: 'row', padding: 16 }}>
           <View style={{ flex: 1, position: 'relative' }}>
             <TextInput
@@ -138,11 +117,10 @@ const Homescreen = ({ navigation }: any) => {
               onBlur={() => setFocused(false)}
             />
             <FontAwesome name="search" size={20} color="#95a5a6" style={{ position: 'absolute', left: 12, top: 12 }} />
-
           </View>
           {focused ? (
             <TouchableOpacity
-              onPress={() => { setFocused(false); Keyboard.dismiss(); setSearchQurey(''); fetchData(); }}
+              onPress={() => { setFocused(false); Keyboard.dismiss(); setSearchQurey(''); setData(data); }}
               style={{
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -187,7 +165,7 @@ const Homescreen = ({ navigation }: any) => {
                         <TouchableOpacity onPress={() => navigation.navigate('Detail', { item })}>
                           <Image source={{ uri: item.thumbnail }} style={{ width: 180, height: 180 }} />
                           <Text style={{ margin: 8, fontSize: 15 }} numberOfLines={1}>{item.title}</Text>
-                          <Text style={{ margin: 8, fontSize: 15 }} numberOfLines={1}>${item.price}</Text>
+                          <Text style={{ margin: 8, fontSize: 15 }}>${item.price}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
